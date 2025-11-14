@@ -1,0 +1,5 @@
+- func to calculate xor
+- auto-subscribe to events when calling monitor
+- create generic function to create tables
+- add monitor sytem, etc...
+- fix unsubscribe

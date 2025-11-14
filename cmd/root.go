@@ -181,5 +181,5 @@ func init() {
 	rootCmd.AddCommand(monitorCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(powerCmd)
-	rootCmd.AddCommand(scanCmd)
+	rootCmd.AddCommand(canCmd)
 }

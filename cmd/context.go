@@ -38,7 +38,7 @@ var contextCmd = &cobra.Command{
 
 // ---------- subcommands ----------
 
-// add NAME --host <HOST> --port <PORT>
+// add NAME --host <HOST> --port <PORT> [--use]
 var contextAddCmd = &cobra.Command{
 	Use:   "add NAME",
 	Short: "Add a new Z21 context",
@@ -47,6 +47,7 @@ var contextAddCmd = &cobra.Command{
 		name := args[0]
 		host, _ := cmd.Flags().GetString("host")
 		port, _ := cmd.Flags().GetInt("port")
+		use, _ := cmd.Flags().GetBool("use")
 
 		store, err := loadContexts()
 		if err != nil {
@@ -72,11 +73,16 @@ var contextAddCmd = &cobra.Command{
 			store.Current = name
 		}
 
+		if use {
+			store.Current = name
+		}
+
 		if err := saveContexts(store); err != nil {
 			return err
 		}
 
-		fmt.Printf("Context %q added\n", name)
+		fmt.Printf("Z21 Configuration Context %q\n\n", name)
+		fmt.Printf("  Host: %s:%d\n\n", host, port)
 		return nil
 	},
 }
@@ -104,13 +110,15 @@ var contextListCmd = &cobra.Command{
 			}
 		}
 
+		fmt.Printf("Known contexts:\n\n")
 		for _, c := range store.Contexts {
 			current := "( )"
 			if store.Current == c.Name {
 				current = "(*)"
 			}
-			fmt.Printf("%s %-*s %s:%d\n", current, maxLen+3, c.Name, c.Host, c.Port)
+			fmt.Printf("  %s %-*s %s:%d\n", current, maxLen+3, c.Name, c.Host, c.Port)
 		}
+		fmt.Println()
 		return nil
 	},
 }
@@ -124,7 +132,15 @@ var contextShowCmd = &cobra.Command{
 		if err != nil {
 			return nil
 		}
-		fmt.Printf("%s %s:%d\n", c.Name, c.Host, c.Port)
+
+		fmt.Printf("Z21 Configuration Context %q\n\n", c.Name)
+		fmt.Printf("  Host: %14s:%d\n", c.Host, c.Port)
+		if c.Session != nil {
+			fmt.Printf("  Session: %s:%d\n", c.Session.LocalHost, c.Session.LocalPort)
+		} else {
+			fmt.Printf("  Session: none\n")
+		}
+		fmt.Println()
 		return nil
 	},
 }
@@ -338,4 +354,5 @@ func init() {
 	)
 	contextAddCmd.Flags().String("host", "", "Z21 host address")
 	contextAddCmd.Flags().Int("port", 0, "Z21 port")
+	contextAddCmd.Flags().Bool("use", false, "use as default")
 }
