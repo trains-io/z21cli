@@ -45,7 +45,10 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func Execute() {
+func Execute(v, c, d string) {
+	Version = v
+	Commit = c
+	Date = d
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
@@ -175,6 +178,7 @@ func getLocalPort(c *z21.Conn) (string, int, error) {
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(contextCmd)
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(subCmd)
