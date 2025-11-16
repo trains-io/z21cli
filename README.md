@@ -137,7 +137,7 @@ Output
  59mA  1mA   22°C  19.9V   18.1V
 ```
 
-To print system information, like device family, hardware platform, serial number, X-bus protocol version, firmware version:
+To print system information, like device family, hardware platform, serial number, X-bus protocol version, and  firmware version:
 
 ```sh
 z21cli info
@@ -188,7 +188,7 @@ Use `z21cli monitor -h` to see how to list and remove subscriptions.
 
 The `z21` CLI can discover and inspect CAN bus detector devices.
 
-To begin, subscribe to CAN-bus update events:
+To begin, we will subscribe to CAN-bus update events:
 
 ```sh
 z21cli sub add CAN_DETECTOR_UPDATES
@@ -200,7 +200,7 @@ Output
 Subscribed to "CAN_DETECTOR_UPDATES"
 ```
 
-Next, discover or inspect devices on the CAN bus.
+Next, we can discover or inspect devices on the CAN bus.
 
 To run device discovery:
 
