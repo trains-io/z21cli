@@ -1,0 +1,59 @@
+project_name: z21cli
+version: 2
+
+release:
+  github:
+    owner: trains-io
+    name: z21cli
+  name_template: "Release {{.Version}}"
+  draft: true
+  prerelease: auto
+
+changelog:
+  disable: true
+
+builds:
+  - id: z21
+    main: .
+    binary: z21
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/trains-io/z21cli/cmd.Version={{.Version}}
+      - -X github.com/trains-io/z21cli/cmd.Commit={{.Commit}}
+      - -X github.com/trains-io/z21cli/cmd.BuildDate={{.Date}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - ids:
+      - z21
+    name_template: "z21cli-{{.Version}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}"
+    wrap_in_directory: false
+    formats:
+      - zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "SHA256SUMS"
+  algorithm: sha256
+
+nfpms:
+  - ids:
+      - z21
+    file_name_template: "z21cli-{{.Version}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}"
+    package_name: z21cli
+    maintainer: P. Beyls <beylsp@gmail.com>
+    bindir: /usr/local/bin
+    license: MIT
+    formats:
+      - deb
+      - rpm
