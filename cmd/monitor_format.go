@@ -51,6 +51,9 @@ func formatMonitorEvent(msg protocol.Message) (string, bool) {
 		}
 		return formatSystemStateEvent(state), true
 	}
+	if protocol.IsCANDetectorReport(msg) {
+		return formatCANDetectorEvent(msg)
+	}
 	if msg.Header != protocol.HeaderLANX {
 		return "", false
 	}
@@ -73,4 +76,52 @@ func formatMonitorEvent(msg protocol.Message) (string, bool) {
 		return formatXStatusChangedEvent(status.CentralState), true
 	}
 	return "", false
+}
+
+func formatCANDetectorEvent(msg protocol.Message) (string, bool) {
+	report, err := protocol.ParseCANDetector(msg.Data)
+	if err != nil {
+		return "", false
+	}
+
+	switch report.Type {
+	case protocol.CANDetectorTypeOccupancy:
+		return fmt.Sprintf("[CAN] Detector 0x%04X module %d port %d: %s (LAN_CAN_DETECTOR)",
+			report.NetID,
+			report.Addr,
+			report.Port+1,
+			protocol.OccupancyStatusLabel(report.Value1),
+		), true
+	default:
+		if protocol.IsCANDetectorLocoAddressType(report.Type) {
+			locos := report.LocoAddresses()
+			return fmt.Sprintf("[CAN] Detector 0x%04X module %d port %d loco %s / %s (LAN_CAN_DETECTOR)",
+				report.NetID,
+				report.Addr,
+				report.Port+1,
+				formatCANDetectorLoco(locos[0]),
+				formatCANDetectorLoco(locos[1]),
+			), true
+		}
+		return fmt.Sprintf("[CAN] Detector 0x%04X module %d port %d type 0x%02x (LAN_CAN_DETECTOR)",
+			report.NetID,
+			report.Addr,
+			report.Port+1,
+			report.Type,
+		), true
+	}
+}
+
+func formatCANDetectorLoco(loco protocol.CANDetectorLocoAddress) string {
+	if loco.Address == 0 {
+		return "-"
+	}
+	switch loco.Direction {
+	case protocol.CANDetectorLocoDirectionForward:
+		return fmt.Sprintf("%d fwd", loco.Address)
+	case protocol.CANDetectorLocoDirectionBackward:
+		return fmt.Sprintf("%d rev", loco.Address)
+	default:
+		return fmt.Sprintf("%d", loco.Address)
+	}
 }

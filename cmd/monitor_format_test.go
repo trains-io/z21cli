@@ -55,6 +55,14 @@ func TestFormatMonitorEvent(t *testing.T) {
 			msg:  protocol.Message{Header: protocol.HeaderLANX, Data: []byte{0x62, 0x22, 0x04, 0x40}},
 			want: "[STAT] short circuit (LAN_X_STATUS_CHANGED)",
 		},
+		{
+			name: "can detector occupancy",
+			msg: protocol.Message{
+				Header: protocol.HeaderLANCANDetector,
+				Data:   []byte{0x04, 0xdb, 0x3c, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00},
+			},
+			want: "[CAN] Detector 0xDB04 module 60 port 1: free (LAN_CAN_DETECTOR)",
+		},
 	}
 
 	for _, tt := range tests {
