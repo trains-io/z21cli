@@ -12,38 +12,46 @@ import (
 	"github.com/trains-io/z21.go/server/servertest"
 )
 
-func TestRunMonitorKeepsSession(t *testing.T) {
-	const (
-		sessionTimeout = 200 * time.Millisecond
-		keepAlive      = 50 * time.Millisecond
-	)
+const monitorFlags = protocol.BroadcastFlagXpressNet
 
-	keepAlives := make(chan struct{}, 100)
+// monitorFixture runs runMonitor against an in-process station. The client
+// subscribes only through its prepended broadcast flags, as in z21.
+type monitorFixture struct {
+	srv        *servertest.Server
+	keepAlives chan struct{} // one per LAN_GET_SERIAL_NUMBER received
+	lines      chan string   // monitor output
+	timeout    <-chan time.Time
+}
+
+func startMonitor(t *testing.T, sessionTimeout, keepAlive time.Duration) *monitorFixture {
+	t.Helper()
+	f := &monitorFixture{
+		keepAlives: make(chan struct{}, 100),
+		lines:      make(chan string),
+		timeout:    time.After(5 * time.Second),
+	}
 	station := server.HandlerFunc(func(w server.ResponseWriter, r *server.Request) {
 		if r.Message.Header == protocol.HeaderLANGetSerialNumber {
-			keepAlives <- struct{}{}
 			w.Reply(protocol.EncodeSerialNumber(1))
+			f.keepAlives <- struct{}{}
 		}
 	})
-	srv := servertest.NewServer(station, server.WithSessionTimeout(sessionTimeout))
-	t.Cleanup(srv.Close)
+	f.srv = servertest.NewServer(station, server.WithSessionTimeout(sessionTimeout))
+	t.Cleanup(f.srv.Close)
 
-	c, err := srv.Dial()
+	c, err := f.srv.Dial()
 	if err != nil {
 		t.Fatalf("Dial: %v", err)
 	}
 	t.Cleanup(func() { c.Close() })
-	if err := c.Send(t.Context(), protocol.SetBroadcastFlags(protocol.BroadcastFlagXpressNet)); err != nil {
-		t.Fatalf("SetBroadcastFlags: %v", err)
-	}
+	c.SetPrependMessages(protocol.SetBroadcastFlags(monitorFlags))
 
 	out, outW := io.Pipe()
-	lines := make(chan string)
 	go func() {
-		defer close(lines)
+		defer close(f.lines)
 		s := bufio.NewScanner(out)
 		for s.Scan() {
-			lines <- s.Text()
+			f.lines <- s.Text()
 		}
 	}()
 
@@ -53,40 +61,71 @@ func TestRunMonitorKeepsSession(t *testing.T) {
 		done <- runMonitor(ctx, c, outW, keepAlive)
 		outW.Close()
 	}()
-
-	timeout := time.After(5 * time.Second)
-	next := func() string {
-		t.Helper()
-		select {
-		case line := <-lines:
-			return line
-		case <-timeout:
-			t.Fatal("monitor printed nothing")
-			return ""
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("runMonitor after cancel = %v, want nil", err)
 		}
-	}
+	})
 
-	if got := next(); got != "Waiting for Z21 events ..." {
+	if got := f.nextLine(t); got != "Waiting for Z21 events ..." {
 		t.Fatalf("first line = %q, want the waiting message", got)
 	}
-	// Ten keep-alives span more than twice the session timeout.
-	for range 10 {
+	return f
+}
+
+func (f *monitorFixture) nextLine(t *testing.T) string {
+	t.Helper()
+	select {
+	case line := <-f.lines:
+		return line
+	case <-f.timeout:
+		t.Fatal("monitor printed nothing")
+		return ""
+	}
+}
+
+func (f *monitorFixture) awaitKeepAlives(t *testing.T, n int) {
+	t.Helper()
+	for range n {
 		select {
-		case <-keepAlives:
-		case <-timeout:
+		case <-f.keepAlives:
+		case <-f.timeout:
 			t.Fatal("keep-alives did not arrive")
 		}
 	}
+}
 
-	if n := srv.Server.Broadcast(protocol.BroadcastFlagXpressNet, protocol.EncodeTrackPowerBC(false)); n != 1 {
-		t.Fatalf("Broadcast reached %d clients, want 1 (session kept)", n)
+// broadcastTrackPowerOff checks that a broadcast reaches the monitor.
+func (f *monitorFixture) broadcastTrackPowerOff(t *testing.T) {
+	t.Helper()
+	if n := f.srv.Server.Broadcast(monitorFlags, protocol.EncodeTrackPowerBC(false)); n != 1 {
+		t.Fatalf("Broadcast reached %d clients, want 1 (subscribed)", n)
 	}
-	if got, want := next(), formatTrackPowerBCEvent(false); got != want {
+	if got, want := f.nextLine(t), formatTrackPowerBCEvent(false); got != want {
 		t.Fatalf("event line = %q, want %q", got, want)
 	}
+}
 
-	cancel()
-	if err := <-done; err != nil {
-		t.Fatalf("runMonitor after cancel = %v, want nil", err)
-	}
+func TestRunMonitorSubscribesAtStart(t *testing.T) {
+	f := startMonitor(t, server.DefaultSessionTimeout, time.Hour)
+
+	f.awaitKeepAlives(t, 1)
+	f.broadcastTrackPowerOff(t)
+}
+
+func TestRunMonitorKeepsSession(t *testing.T) {
+	f := startMonitor(t, 200*time.Millisecond, 50*time.Millisecond)
+
+	// Ten keep-alives span more than twice the session timeout.
+	f.awaitKeepAlives(t, 10)
+	f.broadcastTrackPowerOff(t)
+}
+
+func TestRunMonitorResubscribesWhenForgotten(t *testing.T) {
+	// The session expires between keep-alives, as after a Z21 restart.
+	f := startMonitor(t, 100*time.Millisecond, 300*time.Millisecond)
+
+	f.awaitKeepAlives(t, 3)
+	f.broadcastTrackPowerOff(t)
 }

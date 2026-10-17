@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/spf13/cobra v1.9.1
-	github.com/trains-io/z21.go v0.7.0
+	github.com/trains-io/z21.go v0.8.0
 )
 
 require (
