@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/trains-io/z21.go/client"
@@ -19,7 +21,9 @@ func newMonitorCmd() *cobra.Command {
 		Long: `Print subscribed z21 broadcast events as they arrive.
 
 Subscribe first with "z21 sub add <NAME>", then run monitor. Uses the current
-context session so the z21 command station sends events to this client.
+context session so the z21 command station sends events to this client. A
+keep-alive every 30 seconds stops the z21 from dropping the session (and the
+subscriptions) after a minute without requests.
 
 Press Ctrl+C to stop.`,
 		Args: NoArgs(),
@@ -32,15 +36,27 @@ Press Ctrl+C to stop.`,
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
-			return runMonitor(ctx, app.Client)
+			return runMonitor(ctx, app.Client, cmd.OutOrStdout(), client.DefaultKeepAliveInterval)
 		},
 	}
 	return cmd
 }
 
-func runMonitor(ctx context.Context, c *client.Client) error {
-	fmt.Println("Waiting for Z21 events ...")
+// runMonitor prints the events read from c to w until ctx is done, sending a
+// keep-alive every keepAlive meanwhile.
+func runMonitor(ctx context.Context, c *client.Client, w io.Writer, keepAlive time.Duration) error {
+	ctx, cancel := context.WithCancel(ctx)
+	keepAliveDone := make(chan struct{})
+	go func() {
+		defer close(keepAliveDone)
+		_ = c.KeepAlive(ctx, keepAlive)
+	}()
+	defer func() {
+		cancel()
+		<-keepAliveDone
+	}()
 
+	fmt.Fprintln(w, "Waiting for Z21 events ...")
 	for {
 		msgs, err := c.ReadPacket(ctx)
 		if err != nil {
@@ -52,7 +68,7 @@ func runMonitor(ctx context.Context, c *client.Client) error {
 
 		for _, msg := range msgs {
 			if line, ok := formatMonitorEvent(msg); ok {
-				fmt.Println(line)
+				fmt.Fprintln(w, line)
 			}
 		}
 	}
