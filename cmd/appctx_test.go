@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"net"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/trains-io/z21cli/internal/contextstore"
 )
 
 func TestNeedsAppContext(t *testing.T) {
@@ -83,4 +87,105 @@ func TestUsesDirectDial(t *testing.T) {
 	if !usesDirectDial(pingCmd) {
 		t.Fatal("expected direct dial with --host")
 	}
+}
+
+func TestInitAppContextPinnedPortInUse(t *testing.T) {
+	// Held as by a running z21 monitor.
+	holder, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Close()
+	pinned := holder.LocalAddr().(*net.UDPAddr).Port
+
+	tests := []struct {
+		path    []string
+		wantErr bool
+	}{
+		{path: []string{"status"}},
+		{path: []string{"power", "on"}},
+		{path: []string{"subscribe", "add"}, wantErr: true},
+		{path: []string{"subscribe", "list"}, wantErr: true},
+		{path: []string{"broadcast", "get"}, wantErr: true},
+		{path: []string{"logoff"}, wantErr: true},
+		{path: []string{"context", "reset"}, wantErr: true},
+		{path: []string{"monitor"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.path, " "), func(t *testing.T) {
+			saveContextWithSession(t, pinned)
+			cmd := commandAt(tt.path...)
+
+			err := InitAppContext(cmd)
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "stop monitor first") {
+					t.Fatalf("InitAppContext = %v, want an error telling to stop monitor", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("InitAppContext = %v, want fallback to a free port", err)
+			}
+			app := GetAppContext(cmd)
+			defer app.Client.Close()
+			if got := app.Client.LocalAddr().(*net.UDPAddr).Port; got == pinned {
+				t.Fatalf("local port = %d, want a free port other than the pinned one", got)
+			}
+			if app.Context.Session != nil {
+				t.Fatal("app context has the context's session, want none on the fallback port")
+			}
+		})
+	}
+}
+
+func TestInitAppContextUsesPinnedPort(t *testing.T) {
+	free, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinned := free.LocalAddr().(*net.UDPAddr).Port
+	free.Close()
+
+	saveContextWithSession(t, pinned)
+	cmd := commandAt("subscribe", "add")
+	if err := InitAppContext(cmd); err != nil {
+		t.Fatalf("InitAppContext = %v", err)
+	}
+	app := GetAppContext(cmd)
+	defer app.Client.Close()
+	if got := app.Client.LocalAddr().(*net.UDPAddr).Port; got != pinned {
+		t.Fatalf("local port = %d, want the pinned port %d", got, pinned)
+	}
+}
+
+// saveContextWithSession stores a current context whose session pins
+// localPort, in a fresh HOME.
+func saveContextWithSession(t *testing.T, localPort int) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	store := &contextstore.File{
+		Current: "sim",
+		Contexts: []contextstore.Info{{
+			Name:    "sim",
+			Host:    "127.0.0.1",
+			Port:    21105,
+			Session: &contextstore.Session{LocalHost: "0.0.0.0", LocalPort: localPort},
+		}},
+	}
+	if err := contextstore.Save("", store); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// commandAt returns the last of a chain of commands below a z21 root, with a
+// context as cobra sets one on Execute.
+func commandAt(path ...string) *cobra.Command {
+	cmd := &cobra.Command{Use: "z21"}
+	for _, name := range path {
+		sub := &cobra.Command{Use: name}
+		cmd.AddCommand(sub)
+		cmd = sub
+	}
+	cmd.SetContext(context.Background())
+	return cmd
 }

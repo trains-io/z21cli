@@ -2,14 +2,16 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
+	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/trains-io/z21cli/internal/contextstore"
 	"github.com/trains-io/z21.go/client"
 	"github.com/trains-io/z21.go/protocol"
+	"github.com/trains-io/z21cli/internal/contextstore"
 )
 
 type ctxKey struct{}
@@ -47,6 +49,15 @@ func InitAppContext(cmd *cobra.Command) error {
 
 	addr := net.JoinHostPort(current.Host, strconv.Itoa(port))
 	z21, err := client.DialLocal(addr, localPort)
+	fallback := false
+	if resumed && errors.Is(err, syscall.EADDRINUSE) {
+		if needsSessionPort(cmd) {
+			return fmt.Errorf("%s needs local UDP port %d of context %q, which is in use, probably by z21 monitor: stop monitor first",
+				cmd.CommandPath(), localPort, current.Name)
+		}
+		z21, err = client.DialLocal(addr, 0)
+		fallback = true
+	}
 	if err != nil {
 		return fmt.Errorf("failed to connect to Z21: %w", err)
 	}
@@ -57,12 +68,18 @@ func InitAppContext(cmd *cobra.Command) error {
 		Context: *current,
 		Resumed: resumed,
 	}
+	if fallback {
+		// As with --host: the command does not act on the context's session.
+		app.Context.Session = nil
+	}
 
 	parent := cmd.Context()
 	if parent == nil {
 		parent = context.Background()
 	}
-	if shouldApplyBroadcastFlags(cmd) {
+	// A fallback session ends with the command; subscribing it would only send
+	// broadcasts to a closed port.
+	if shouldApplyBroadcastFlags(cmd) && !fallback {
 		z21.SetPrependMessages(protocol.SetBroadcastFlags(effectiveBroadcastFlags(current.Session)))
 	}
 
@@ -175,6 +192,24 @@ func shouldApplyBroadcastFlags(cmd *cobra.Command) bool {
 		return false
 	}
 	return true
+}
+
+// needsSessionPort reports whether cmd must use the context's pinned local
+// port: the Z21 keeps broadcast flags and sessions per IP address and port, so
+// these commands would act on the wrong session from another port. Other
+// commands fall back to a free port while the pinned one is in use.
+func needsSessionPort(cmd *cobra.Command) bool {
+	if isUnderSubscribe(cmd) || isUnderBroadcast(cmd) {
+		return true
+	}
+	if isUnderContext(cmd) && cmd.Name() == "reset" {
+		return true
+	}
+	switch cmd.Name() {
+	case "logoff", "monitor":
+		return true
+	}
+	return false
 }
 
 func isUnderSubscribe(cmd *cobra.Command) bool {
