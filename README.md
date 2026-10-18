@@ -172,7 +172,7 @@ Functions   F0
 Busy        no
 ```
 
-Speed is a speed step: 0 stops, at most 14, 28 or 126. Asking for a loco subscribes the session to its changes (at most 16 locos); with `XPRESSNET_UPDATES` subscribed, `z21 monitor` shows them as `[LOCO]` lines. `ALL_LOCO_INFO_UPDATES` shows the changes of every loco.
+Speed is a speed step: 0 stops, at most 14, 28 or 126. To watch locos, use `z21 monitor --loco ADDR` (see [Live monitoring](#live-monitoring)).
 
 ### System commands
 
@@ -348,8 +348,22 @@ Output:
 Waiting for z21 events ...
 [SYS] Main: 30mA  Prog: 0mA   Temp: 27°C  Volt: 19.9V (18.0V)
 [SYS] Main: 36mA  Prog: 0mA   Temp: 27°C  Volt: 20.0V (18.0V)
+```
+
+To also watch locos (at most 16), pass `--loco`; monitor subscribes to them at start and with every keep-alive, and prints a loco whenever it changes:
+
+```bash
+z21 monitor --loco 3 --loco 1234
+```
+
+```bash
+Waiting for z21 events ...
+[LOCO] 3: forward, speed 0/126, functions off (LAN_X_LOCO_INFO)
+[LOCO] 1234: reverse, speed 10/28, functions F0 (LAN_X_LOCO_INFO)
 [LOCO] 3: forward, speed 40/126, functions F0 (LAN_X_LOCO_INFO)
 ```
+
+`--loco` adds `XPRESSNET_UPDATES` for the monitor's session if neither it nor `ALL_LOCO_INFO_UPDATES` is subscribed: the z21 sends loco changes only with one of them. `z21 sub add ALL_LOCO_INFO_UPDATES` shows the changes of every loco instead.
 
 Press `Ctrl+C` to stop.
 
