@@ -156,6 +156,9 @@ func needsAppContext(cmd *cobra.Command, args []string) bool {
 		if isUnderCan(cmd) {
 			return true
 		}
+		if isUnderLoco(cmd) {
+			return true
+		}
 		if isUnderSubscribe(cmd) {
 			return true
 		}
@@ -188,7 +191,7 @@ func shouldApplyBroadcastFlags(cmd *cobra.Command) bool {
 			return false
 		}
 	}
-	if cmd.Name() == "stop" {
+	if cmd.Name() == "stop" && !isUnderLoco(cmd) {
 		return false
 	}
 	return true
@@ -224,6 +227,15 @@ func isUnderSubscribe(cmd *cobra.Command) bool {
 func isUnderPower(cmd *cobra.Command) bool {
 	for c := cmd; c != nil; c = c.Parent() {
 		if c.Name() == "power" {
+			return true
+		}
+	}
+	return false
+}
+
+func isUnderLoco(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Name() == "loco" {
 			return true
 		}
 	}

@@ -6,7 +6,7 @@ A command line utility to interact with and manage z21 command stations.
 
 - **Context** — named endpoints, sessions, and configuration file management
 - **Version** — device identity, firmware, hardware, and protocol version
-- **Track** — track power and emergency stop
+- **Track** — track power, emergency stop, and driving locomotives
 - **System** — connectivity, status, LAN discovery, and CAN detectors
 - **Monitor** — broadcast flag control, named subscriptions, and live event streaming
 
@@ -36,7 +36,7 @@ Run `z21 --help` for the full list. Commands are grouped as follows:
 |-------|----------|
 | **Version** | `code`, `firmware`, `hwinfo`, `version` |
 | **Context** | `context` (`ctx`), `logoff` |
-| **Track** | `power`, `stop` |
+| **Track** | `loco`, `power`, `stop` |
 | **System** | `can`, `discover`, `ping`, `serial`, `status`, `system` |
 | **Monitor** | `broadcast` (`bc`), `monitor` (`mon`), `subscribe` (`sub`) |
 
@@ -145,6 +145,34 @@ z21 power off
 z21 power status
 z21 stop
 ```
+
+#### Locomotives
+
+Read and drive a locomotive by address (1–9999). Each command shows the loco's state afterwards:
+
+```sh
+z21 loco info 3
+z21 loco drive 3 40                         # speed step 40, direction and speed steps kept
+z21 loco drive 3 10 --reverse --steps 28    # 14, 28 or 128 speed steps
+z21 loco func 3 0=on 1=toggle 2=off         # functions F0–F31
+z21 loco stop 3                             # emergency stop for this loco only
+```
+
+Output:
+
+```sh
+LOCO        STATE
+-------------------
+Address     3
+Format      DCC
+Speed steps 128
+Direction   forward
+Speed       40/126
+Functions   F0
+Busy        no
+```
+
+Speed is a speed step: 0 stops, at most 14, 28 or 126. Asking for a loco subscribes the session to its changes (at most 16 locos); with `XPRESSNET_UPDATES` subscribed, `z21 monitor` shows them as `[LOCO]` lines. `ALL_LOCO_INFO_UPDATES` shows the changes of every loco.
 
 ### System commands
 
@@ -320,6 +348,7 @@ Output:
 Waiting for z21 events ...
 [SYS] Main: 30mA  Prog: 0mA   Temp: 27°C  Volt: 19.9V (18.0V)
 [SYS] Main: 36mA  Prog: 0mA   Temp: 27°C  Volt: 20.0V (18.0V)
+[LOCO] 3: forward, speed 40/126, functions F0 (LAN_X_LOCO_INFO)
 ```
 
 Press `Ctrl+C` to stop.

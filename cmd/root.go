@@ -101,6 +101,7 @@ func init() {
 	for _, cmd := range []*cobra.Command{
 		newPowerCmd(),
 		newStopCmd(),
+		newLocoCmd(),
 	} {
 		cmd.GroupID = "track"
 		rootCmd.AddCommand(cmd)

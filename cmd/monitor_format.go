@@ -72,6 +72,9 @@ func formatMonitorEvent(msg protocol.Message) (string, bool) {
 	if protocol.IsUnknownCommand(msg.Data) {
 		return formatUnknownCommandEvent(), true
 	}
+	if info, err := protocol.ParseLocoInfo(msg.Data); err == nil {
+		return formatLocoInfoEvent(info), true
+	}
 	if status, err := protocol.ParseXStatus(msg.Data); err == nil {
 		return formatXStatusChangedEvent(status.CentralState), true
 	}

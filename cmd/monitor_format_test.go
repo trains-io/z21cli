@@ -56,6 +56,29 @@ func TestFormatMonitorEvent(t *testing.T) {
 			want: "[STAT] short circuit (LAN_X_STATUS_CHANGED)",
 		},
 		{
+			name: "loco info",
+			msg: protocol.EncodeLocoInfo(protocol.LocoInfo{
+				Address: 3, SpeedSteps: protocol.LocoInfoSpeedSteps128, Forward: true, Speed: 0x29,
+				Headlight: true, FunctionsF1F4: 0x04, FunctionsF29F31: 0x04,
+			}),
+			want: "[LOCO] 3: forward, speed 40/126, functions F0 F3 F31 (LAN_X_LOCO_INFO)",
+		},
+		{
+			name: "loco info emergency stop, busy",
+			msg: protocol.EncodeLocoInfo(protocol.LocoInfo{
+				Address: 1234, SpeedSteps: protocol.LocoInfoSpeedSteps28, Speed: protocol.LocoSpeedEStop, Busy: true,
+			}),
+			want: "[LOCO] 1234: reverse, emergency stop, functions off, busy (LAN_X_LOCO_INFO)",
+		},
+		{
+			name: "loco info 14 speed steps",
+			msg: protocol.EncodeLocoInfo(protocol.LocoInfo{
+				Address: 5, SpeedSteps: protocol.LocoInfoSpeedSteps14, Forward: true, Speed: 0x0F,
+				FunctionsF5F12: 0x80, FunctionsF13F20: 0x01, FunctionsF21F28: 0x80,
+			}),
+			want: "[LOCO] 5: forward, speed 14/14, functions F12 F13 F28 (LAN_X_LOCO_INFO)",
+		},
+		{
 			name: "can detector occupancy",
 			msg: protocol.Message{
 				Header: protocol.HeaderLANCANDetector,
