@@ -102,6 +102,8 @@ func init() {
 		newPowerCmd(),
 		newStopCmd(),
 		newLocoCmd(),
+		newTurnoutCmd(),
+		newAccessoryCmd(),
 	} {
 		cmd.GroupID = "track"
 		rootCmd.AddCommand(cmd)

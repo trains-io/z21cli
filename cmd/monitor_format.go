@@ -75,6 +75,12 @@ func formatMonitorEvent(msg protocol.Message) (string, bool) {
 	if info, err := protocol.ParseLocoInfo(msg.Data); err == nil {
 		return formatLocoInfoEvent(info), true
 	}
+	if info, err := protocol.ParseTurnoutInfo(msg.Data); err == nil {
+		return formatTurnoutInfoEvent(info), true
+	}
+	if info, err := protocol.ParseExtAccessoryInfo(msg.Data); err == nil {
+		return formatExtAccessoryInfoEvent(info), true
+	}
 	if status, err := protocol.ParseXStatus(msg.Data); err == nil {
 		return formatXStatusChangedEvent(status.CentralState), true
 	}

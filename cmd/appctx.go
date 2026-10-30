@@ -156,7 +156,7 @@ func needsAppContext(cmd *cobra.Command, args []string) bool {
 		if isUnderCan(cmd) {
 			return true
 		}
-		if isUnderLoco(cmd) {
+		if isUnderLoco(cmd) || isUnderSwitching(cmd) {
 			return true
 		}
 		if isUnderSubscribe(cmd) {
@@ -236,6 +236,15 @@ func isUnderPower(cmd *cobra.Command) bool {
 func isUnderLoco(cmd *cobra.Command) bool {
 	for c := cmd; c != nil; c = c.Parent() {
 		if c.Name() == "loco" {
+			return true
+		}
+	}
+	return false
+}
+
+func isUnderSwitching(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Name() == "turnout" || c.Name() == "accessory" {
 			return true
 		}
 	}

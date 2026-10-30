@@ -36,7 +36,7 @@ Run `z21 --help` for the full list. Commands are grouped as follows:
 |-------|----------|
 | **Version** | `code`, `firmware`, `hwinfo`, `version` |
 | **Context** | `context` (`ctx`), `logoff` |
-| **Track** | `loco`, `power`, `stop` |
+| **Track** | `accessory`, `loco`, `power`, `stop`, `turnout` |
 | **System** | `can`, `discover`, `ping`, `serial`, `status`, `system` |
 | **Monitor** | `broadcast` (`bc`), `monitor` (`mon`), `subscribe` (`sub`) |
 
@@ -173,6 +173,29 @@ Busy        no
 ```
 
 Speed is a speed step: 0 stops, at most 14, 28 or 126. To watch locos, use `z21 monitor --loco ADDR` (see [Live monitoring](#live-monitoring)).
+
+#### Turnouts and accessories
+
+Switch turnouts and set extended accessory decoders (for example signals). Addresses are as on the wire, 0–2047: 0 is turnout 1 in the Z21 app. Each command shows the state afterwards:
+
+```sh
+z21 turnout get 12
+z21 turnout set 12 2                        # output 2: activate, wait 100 ms, deactivate
+z21 turnout set 12 1 --pulse 250ms          # --pulse 0 leaves the output activated
+z21 accessory get 3
+z21 accessory set 3 0x12                    # value 0–255, decimal or 0x hex
+```
+
+Output:
+
+```sh
+TURNOUT  STATE
+-----------------
+Address  12
+Position output 2
+```
+
+`--queue` lets the Z21 queue turnout commands (Q flag, firmware 1.24 and later). To watch turnouts and accessories, subscribe to `XPRESSNET_UPDATES` and run `z21 monitor`.
 
 ### System commands
 
@@ -364,6 +387,13 @@ Waiting for z21 events ...
 ```
 
 `--loco` adds `XPRESSNET_UPDATES` for the monitor's session if neither it nor `ALL_LOCO_INFO_UPDATES` is subscribed: the z21 sends loco changes only with one of them. `z21 sub add ALL_LOCO_INFO_UPDATES` shows the changes of every loco instead.
+
+With `XPRESSNET_UPDATES`, monitor also prints turnouts and extended accessories after every switch command, also when nothing changed:
+
+```bash
+[TURNOUT] 12: output 2 (LAN_X_TURNOUT_INFO)
+[ACCESSORY] 3: value 18 (0x12) (LAN_X_EXT_ACCESSORY_INFO)
+```
 
 Press `Ctrl+C` to stop.
 

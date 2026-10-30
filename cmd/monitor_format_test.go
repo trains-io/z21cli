@@ -79,6 +79,26 @@ func TestFormatMonitorEvent(t *testing.T) {
 			want: "[LOCO] 5: forward, speed 14/14, functions F12 F13 F28 (LAN_X_LOCO_INFO)",
 		},
 		{
+			name: "turnout info",
+			msg:  protocol.EncodeTurnoutInfo(protocol.TurnoutInfo{Address: 12, Position: protocol.TurnoutPositionOutput2}),
+			want: "[TURNOUT] 12: output 2 (LAN_X_TURNOUT_INFO)",
+		},
+		{
+			name: "turnout info not switched",
+			msg:  protocol.EncodeTurnoutInfo(protocol.TurnoutInfo{Address: 0}),
+			want: "[TURNOUT] 0: not switched (LAN_X_TURNOUT_INFO)",
+		},
+		{
+			name: "ext accessory info",
+			msg:  protocol.EncodeExtAccessoryInfo(protocol.ExtAccessoryInfo{Address: 3, Value: 0x12}),
+			want: "[ACCESSORY] 3: value 18 (0x12) (LAN_X_EXT_ACCESSORY_INFO)",
+		},
+		{
+			name: "ext accessory info unknown",
+			msg:  protocol.EncodeExtAccessoryInfo(protocol.ExtAccessoryInfo{Address: 3, Status: protocol.ExtAccessoryStatusUnknown}),
+			want: "[ACCESSORY] 3: value unknown (LAN_X_EXT_ACCESSORY_INFO)",
+		},
+		{
 			name: "can detector occupancy",
 			msg: protocol.Message{
 				Header: protocol.HeaderLANCANDetector,
